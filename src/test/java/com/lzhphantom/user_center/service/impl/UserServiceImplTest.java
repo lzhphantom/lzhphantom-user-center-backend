@@ -1,11 +1,14 @@
 package com.lzhphantom.user_center.service.impl;
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
 
 import com.lzhphantom.user_center.model.domain.User;
 import com.lzhphantom.user_center.model.request.UserRegisterRequest;
 import com.lzhphantom.user_center.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.util.Assert;
 import org.springframework.util.DigestUtils;
 
 import javax.annotation.Resource;
@@ -43,5 +46,13 @@ class UserServiceImplTest {
     }
 
     void getSafetyUser() {
+    }
+
+    @Test
+    void searchUsersByTags() {
+
+        List<String> tags = Arrays.asList("123","456");
+        List<User> users = userService.searchUsersByTags(tags);
+        Assert.notNull(users,"123");
     }
 }

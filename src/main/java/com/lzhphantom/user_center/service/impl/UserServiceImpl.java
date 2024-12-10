@@ -1,5 +1,7 @@
 package com.lzhphantom.user_center.service.impl;
 
+import cn.hutool.json.JSONUtil;
+import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.lzhphantom.user_center.common.ErrorCode;
 import com.lzhphantom.user_center.exception.BusinessException;
@@ -9,13 +11,17 @@ import com.lzhphantom.user_center.model.request.UserRegisterRequest;
 import com.lzhphantom.user_center.service.UserService;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.boot.json.GsonJsonParser;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.DigestUtils;
 
 import javax.servlet.http.HttpServletRequest;
 
+import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import static com.lzhphantom.user_center.constants.UserConstant.SALT;
 import static com.lzhphantom.user_center.constants.UserConstant.USER_LOGIN_STATE;
@@ -67,6 +73,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         user.setLoginAccount(dto.getUserAccount());
         user.setPassword(encryptPassword);
         user.setUsername(dto.getUsername());
+        user.setGender(dto.getGender());
+        user.setPhone(dto.getPhone());
+        user.setEmail(dto.getEmail());
         if (!save(user)) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR,"注册失败");
         }
@@ -132,6 +141,47 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     public int userLogout(HttpServletRequest request) {
         request.getSession().removeAttribute(USER_LOGIN_STATE);
         return 1;
+    }
+
+    /**
+     * 根据标签搜索用户 内存运算
+     * @param tags 标签列
+     * @return 用户列
+     */
+    @Override
+    public List<User> searchUsersByTags(List<String> tags) {
+        if (CollectionUtils.isEmpty(tags)){
+            throw new BusinessException(ErrorCode.PARAMS_NULL_ERROR);
+        }
+        List<User> users = lambdaQuery().isNotNull(User::getTags).list();
+        GsonJsonParser parser = new GsonJsonParser();
+        return users.stream().filter(item->{
+            String itemTags = item.getTags();
+            List<String> tagList = JSONUtil.toList(itemTags, String.class);
+            for (String tag : tags) {
+                if (!tagList.contains(tag)){
+                    return false;
+                }
+            }
+            return true;
+        }).map(this::getSafetyUser).collect(Collectors.toList());
+    }
+
+    /**
+     * 通过sql查询
+     * @param tags 标签列
+     * @return 用户列表
+     */
+    @Deprecated
+    private List<User> searchUsersByTagsBySQL(List<String> tags) {
+        if (CollectionUtils.isEmpty(tags)){
+            throw new BusinessException(ErrorCode.PARAMS_NULL_ERROR);
+        }
+        LambdaQueryChainWrapper<User> lambdaQuery = lambdaQuery();
+        tags.forEach(item->{
+            lambdaQuery.like(User::getTags,item);
+        });
+        return lambdaQuery.list().stream().map(this::getSafetyUser).collect(Collectors.toList());
     }
 }
 

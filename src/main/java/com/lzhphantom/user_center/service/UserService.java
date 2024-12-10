@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.lzhphantom.user_center.model.request.UserRegisterRequest;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 
 /**
  * @author lzhphantom
@@ -43,4 +44,12 @@ public interface UserService extends IService<User> {
      * @param request 请求
      */
     int userLogout(HttpServletRequest request);
+
+    /**
+     * 根据标签搜索用户
+     *
+     * @param tags 标签列
+     * @return 用户数量
+     */
+    List<User> searchUsersByTags(List<String> tags);
 }
