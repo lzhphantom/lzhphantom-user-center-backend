@@ -1,6 +1,6 @@
 DROP TABLE IF EXISTS `user`;
 
-create table user_center.user
+create table `user`
 (
     id           bigint auto_increment
         primary key,
