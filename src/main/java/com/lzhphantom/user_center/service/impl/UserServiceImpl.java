@@ -1,5 +1,6 @@
 package com.lzhphantom.user_center.service.impl;
 
+import cn.hutool.core.util.ReUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -44,7 +45,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         if (StringUtils.isAnyBlank(dto.getUserAccount(), dto.getUserPassword(), dto.getCheckPassword())) {
             throw new BusinessException(ErrorCode.PARAMS_NULL_ERROR,"参数为空");
         }
-        if (dto.getUsername().length() < 4) {
+        if ((ReUtil.isMatch("[\\u4e00-\\u9fa5]+", dto.getUsername()) && dto.getUsername().length()<2)
+        || (!ReUtil.isMatch("[\\u4e00-\\u9fa5]+", dto.getUsername()) && dto.getUsername().length() < 4)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"昵称过短");
         }
         if (dto.getUserAccount().length() < 4) {
@@ -81,6 +83,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         }
         return user.getId();
     }
+
+
 
     @Override
     public User doLogin(String userAccount, String userPassword, HttpServletRequest request) {
