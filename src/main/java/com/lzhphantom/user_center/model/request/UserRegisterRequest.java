@@ -14,4 +14,5 @@ public class UserRegisterRequest implements Serializable {
     private Integer gender;
     private String phone;
     private String email;
+    private String profile;
 }
