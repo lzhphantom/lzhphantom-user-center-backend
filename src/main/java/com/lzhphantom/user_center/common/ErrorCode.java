@@ -15,7 +15,8 @@ public enum ErrorCode {
     NO_AUTH(40101, "无权限"),
     SYSTEM_ERROR(50000, "系统内部异常"),
     RECORD_NOT_EXIST_ERROR(50002, "记录不存在"),
-    DUPLICATE_ERROR(50001, "重复异常");
+    DUPLICATE_ERROR(50001, "重复异常"),
+    RECORD_NOT_EXIST(50003, "数据不存在");
 
     /**
      * 状态码

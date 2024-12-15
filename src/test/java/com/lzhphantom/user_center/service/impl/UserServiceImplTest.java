@@ -1,15 +1,24 @@
 package com.lzhphantom.user_center.service.impl;
+
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import cn.hutool.core.collection.CollUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.github.javafaker.Faker;
+import com.lzhphantom.user_center.mapper.TeamMapper;
+import com.lzhphantom.user_center.model.domain.Team;
 import com.lzhphantom.user_center.model.domain.User;
+import com.lzhphantom.user_center.model.dto.TeamQuery;
 import com.lzhphantom.user_center.model.request.UserRegisterRequest;
+import com.lzhphantom.user_center.model.vo.TeamUserVo;
 import com.lzhphantom.user_center.service.UserService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.util.Assert;
@@ -24,6 +33,16 @@ import static com.lzhphantom.user_center.constants.UserConstant.SALT;
 class UserServiceImplTest {
     @Resource
     private UserService userService;
+
+    @Resource
+    private TeamMapper teamMapper;
+
+    private Faker faker;
+
+    @BeforeEach
+    void setUp() {
+        this.faker = new Faker(new Locale("zh_CN"));
+    }
 
     @Test
     void userRegister() {
@@ -54,56 +73,85 @@ class UserServiceImplTest {
     }
 
     @Test
-    void searchUsersByTags() {
+    void userTeamList(){
+        StopWatch stopWatch = new StopWatch();
+        stopWatch.start();
+        // 获取拼接的 where 条件
+        TeamQuery query = new TeamQuery();
+        query.setName("test");
+        List<TeamUserVo> teamUserVos = teamMapper.selectTeamsWithDynamicQuery(query);
+        stopWatch.stop();
+        System.out.println(stopWatch.getTotalTimeMillis());
+        System.out.println(teamUserVos.size());
 
-        List<String> tags = Arrays.asList("123","456");
-        List<User> users = userService.searchUsersByTags(tags);
-        Assert.notNull(users,"123");
     }
 
     @Test
-    void insertUserByMybatisBatch(){
+    void searchUsersByTags() {
+
+        List<String> tags = Arrays.asList("123", "456");
+        List<User> users = userService.searchUsersByTags(tags);
+        Assert.notNull(users, "123");
+    }
+
+    @Test
+    void insertUserByMybatisBatch() {
         StopWatch stopWatch = new StopWatch();
         stopWatch.start();
         final int batchNum = 100000;
         List<User> userList = CollUtil.newArrayList();
         for (int i = 0; i < batchNum; i++) {
             User user = new User();
-            user.setUsername("test"+i);
-            user.setLoginAccount("test"+i);
+            user.setUsername(faker.name().fullName());
+            user.setLoginAccount("test" + i);
             user.setAvatarUrl("https://fastly.jsdelivr.net/npm/@vant/assets/cat.jpeg");
-            user.setGender(1);
+            user.setGender(i % 2 == 0 ? 1 : 0);
             String encryptPassword = DigestUtils.md5DigestAsHex((SALT + "test@1234").getBytes());
             user.setPassword(encryptPassword);
-            user.setPhone("12345678901");
-            user.setEmail("test@test.com");
+            user.setPhone(faker.phoneNumber().phoneNumber());
+            user.setEmail(faker.internet().emailAddress());
             user.setTags("[]");
-            user.setProfile("个人简介：久啊塑料袋客服经理萨达会计法立卡");
+            user.setProfile(faker.lorem().paragraph(10));
             userList.add(user);
         }
-        userService.saveBatch(userList,10000);
+        userService.saveBatch(userList, 10000);
         stopWatch.stop();
         System.out.println(stopWatch.getTotalTimeMillis());
     }
 
+    private static String generatePersonalProfile(Faker faker) {
+        return "姓名: " + faker.name().fullName() + "\n" +
+                "性别: " + (faker.bool().bool() ? "男" : "女") + "\n" +
+                "出生日期: " + faker.date().birthday().toString() + "\n" +
+                "联系方式: " + faker.phoneNumber().cellPhone() + "\n" +
+                "电子邮件: " + faker.internet().emailAddress() + "\n" +
+                "现居地址: " + faker.address().fullAddress() + "\n" +
+                "职业: " + faker.company().profession() + "\n" +
+                "公司: " + faker.company().name() + "\n" +
+                "职位: " + faker.company().bs() + "\n" +
+                "个人简介: " + faker.lorem().paragraph(3) + "\n" +
+                "技能: " + String.join(", ", faker.options().option("Java", "Python", "C++", "JavaScript", "Go")) + "\n" +
+                "兴趣爱好: " + String.join(", ", faker.options().option("阅读", "旅行", "编程", "电影", "音乐")) + "\n";
+    }
+
     @Test
-    void insertUserByConcurrency(){
+    void insertUserByConcurrency() {
         StopWatch stopWatch = new StopWatch();
         stopWatch.start();
         final int batchNum = 100000;
         List<User> userList = CollUtil.newArrayList();
         for (int i = 0; i < batchNum; i++) {
             User user = new User();
-            user.setUsername("test"+i);
-            user.setLoginAccount("test"+i);
+            user.setUsername(faker.name().fullName());
+            user.setLoginAccount("test" + i);
             user.setAvatarUrl("https://fastly.jsdelivr.net/npm/@vant/assets/cat.jpeg");
-            user.setGender(1);
+            user.setGender(i % 2 == 0 ? 1 : 0);
             String encryptPassword = DigestUtils.md5DigestAsHex((SALT + "test@1234").getBytes());
             user.setPassword(encryptPassword);
-            user.setPhone("12345678901");
-            user.setEmail("test@test.com");
+            user.setPhone(faker.phoneNumber().phoneNumber());
+            user.setEmail(faker.internet().emailAddress());
             user.setTags("[]");
-            user.setProfile("个人简介：久啊塑料袋客服经理萨达会计法立卡");
+            user.setProfile(faker.lorem().paragraph(3));
             userList.add(user);
         }
         // 将数据分成10组
@@ -121,7 +169,7 @@ class UserServiceImplTest {
         List<CompletableFuture<Void>> futures = CollUtil.newArrayList();
         for (List<User> group : groups) {
             CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
-                System.out.println("test"+Thread.currentThread().getName());
+                System.out.println("test" + Thread.currentThread().getName());
                 userService.saveBatch(group, 1000);
             }, executorService);
             futures.add(future);
