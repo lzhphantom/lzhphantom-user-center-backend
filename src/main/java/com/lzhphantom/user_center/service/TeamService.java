@@ -6,6 +6,7 @@ import com.lzhphantom.user_center.model.domain.User;
 import com.lzhphantom.user_center.model.dto.TeamQuery;
 import com.lzhphantom.user_center.model.request.team.*;
 import com.lzhphantom.user_center.model.vo.TeamUserVo;
+import com.lzhphantom.user_center.model.vo.TeamVo;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -62,4 +63,18 @@ public interface TeamService extends IService<Team> {
      * @return 是否成功
      */
     boolean deleteTeam(TeamDeleteRequest teamDeleteRequest, User loginUser);
+
+    /**
+     * 获取我创建的队伍
+     * @param loginUser 登录用户
+     * @return 队伍列表
+     */
+    List<TeamUserVo> myTeams(User loginUser);
+
+    /**
+     * 获取我加入的队伍
+     * @param loginUser 登录用户
+     * @return 队伍列表
+     */
+    List<TeamUserVo> myJoinTeams(User loginUser);
 }

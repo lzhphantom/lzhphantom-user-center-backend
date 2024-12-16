@@ -2,6 +2,7 @@ package com.lzhphantom.user_center.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -16,6 +17,7 @@ import com.lzhphantom.user_center.model.dto.TeamQuery;
 import com.lzhphantom.user_center.model.enums.TeamStatusEnum;
 import com.lzhphantom.user_center.model.request.team.*;
 import com.lzhphantom.user_center.model.vo.TeamUserVo;
+import com.lzhphantom.user_center.model.vo.TeamVo;
 import com.lzhphantom.user_center.model.vo.UserVo;
 import com.lzhphantom.user_center.service.TeamService;
 import com.lzhphantom.user_center.mapper.TeamMapper;
@@ -44,6 +46,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
 
     /**
      * 添加队伍
+     *
      * @param team      队伍信息
      * @param loginUser 当前用户
      * @return 队伍id
@@ -86,7 +89,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         // 校验用户最多创建数量
         Long creatTeamNum = lambdaQuery().eq(Team::getUserId, loginUser.getId()).count();
         if (creatTeamNum >= 5) {
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "最多创建5个队伍");
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "最多创建或加入5个队伍");
         }
         Team copied = BeanUtil.copyProperties(team, Team.class);
         copied.setUserId(loginUser.getId());
@@ -108,15 +111,21 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
 
     /**
      * 搜索队伍
+     *
      * @param teamQuery 查询条件
-     * @param isAdmin 是否是管理员
+     * @param isAdmin   是否是管理员
      * @return
      */
     @Override
     public List<TeamUserVo> listTeams(TeamQuery teamQuery, boolean isAdmin) {
 
         if (ObjUtil.isNull(teamQuery)) {
-            return this.baseMapper.selectAllTeamsWithUsersOptimized();
+            return this.baseMapper.selectAllTeamsWithUsersOptimized().stream().filter(item -> {
+                if (!isAdmin) {
+                    return TeamStatusEnum.PRIVATE.equals(TeamStatusEnum.getEnumByValue(item.getStatus()));
+                }
+                return true;
+            }).collect(Collectors.toList());
         }
         LambdaQueryChainWrapper<Team> wrapper = lambdaQuery();
         wrapper.and(qw -> qw.gt(Team::getExpireTime, LocalDateTime.now()).or().isNull(Team::getExpireTime));
@@ -164,7 +173,11 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             if (!isAdmin && !statusEnum.equals(TeamStatusEnum.PUBLIC)) {
                 throw new BusinessException(ErrorCode.NO_AUTH);
             }
+
             wrapper.eq(Team::getStatus, status);
+        }
+        if (!isAdmin) {
+            wrapper.ne(Team::getStatus, TeamStatusEnum.PRIVATE.getValue());
         }
         //查询队伍
 //        return this.baseMapper.selectTeamsWithDynamicQuery(teamQuery);
@@ -172,7 +185,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         if (CollUtil.isEmpty(list)) {
             return CollUtil.newArrayList();
         }
-        //管理用户信息
+
         List<Long> teamIdList = list.stream().map(Team::getId).collect(Collectors.toList());
         List<UserTeam> userTeams = userTeamService.lambdaQuery().in(UserTeam::getTeamId, teamIdList).list();
         Map<Long, List<Long>> teamContainUsers = userTeams.stream().collect(Collectors.groupingBy(UserTeam::getTeamId, Collectors.mapping(UserTeam::getUserId, Collectors.toList())));
@@ -192,7 +205,8 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
 
     /**
      * 更新队伍信息
-     * @param request 修改队伍信息
+     *
+     * @param request   修改队伍信息
      * @param loginUser 登录用户
      * @return 修改成功
      */
@@ -236,8 +250,9 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
 
     /**
      * 加入队伍
+     *
      * @param teamJoinRequest 加入队伍信息
-     * @param loginUser 登录用户
+     * @param loginUser       登录用户
      * @return 加入成功
      */
     @Override
@@ -282,49 +297,50 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
 
     /**
      * 退出队伍
+     *
      * @param teamQuitRequest 退出队伍信息
-     * @param loginUser 登录用户
+     * @param loginUser       登录用户
      * @return 退出成功
      */
     @Override
     @Transactional
     public boolean quitTeam(TeamQuitRequest teamQuitRequest, User loginUser) {
-        if (ObjUtil.isNull(teamQuitRequest)){
+        if (ObjUtil.isNull(teamQuitRequest)) {
             throw new BusinessException(ErrorCode.PARAMS_NULL_ERROR);
         }
         Long teamId = teamQuitRequest.getId();
-        if (ObjUtil.isNull(teamId) || teamId <= 0){
+        if (ObjUtil.isNull(teamId) || teamId <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         Team team = this.baseMapper.selectById(teamId);
-        if (ObjUtil.isNull(team)){
+        if (ObjUtil.isNull(team)) {
             throw new BusinessException(ErrorCode.RECORD_NOT_EXIST);
         }
         boolean exists = userTeamService.lambdaQuery().eq(UserTeam::getUserId, loginUser.getId())
                 .eq(UserTeam::getTeamId, teamId).exists();
-        if (!exists){
+        if (!exists) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "未加入该队伍");
         }
         Long currentTeamUserNum = userTeamService.lambdaQuery().eq(UserTeam::getTeamId, teamId).count();
-        if (currentTeamUserNum == 1){
+        if (currentTeamUserNum == 1) {
             //最后一人，删除队伍
             boolean success = removeById(teamId);
-            if (!success){
+            if (!success) {
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, "删除队伍失败");
             }
             return userTeamService.lambdaUpdate().eq(UserTeam::getTeamId, teamId).remove();
-        }else {
-            if (team.getOwnerUserId().equals(loginUser.getId())){
+        } else {
+            if (team.getOwnerUserId().equals(loginUser.getId())) {
                 //是队长，转移关系
                 List<UserTeam> userTeams = userTeamService.lambdaQuery().eq(UserTeam::getTeamId, teamId)
                         .orderByAsc(UserTeam::getJoinTime).last("limit 2").list();
-                if (CollUtil.isEmpty(userTeams) || userTeams.size()<=1){
+                if (CollUtil.isEmpty(userTeams) || userTeams.size() <= 1) {
                     throw new BusinessException(ErrorCode.SYSTEM_ERROR, "队伍人数少于两人");
                 }
                 UserTeam nextOwner = userTeams.get(1);
                 team.setOwnerUserId(nextOwner.getUserId());
                 boolean success = updateById(team);
-                if (!success){
+                if (!success) {
                     throw new BusinessException(ErrorCode.SYSTEM_ERROR, "更新队伍信息失败");
                 }
             }
@@ -335,32 +351,88 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
 
     /**
      * 解散队伍
+     *
      * @param teamDeleteRequest 解散队伍信息
-     * @param loginUser 登录用户
+     * @param loginUser         登录用户
      * @return 解散成功
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean deleteTeam(TeamDeleteRequest teamDeleteRequest, User loginUser) {
-        if (ObjUtil.isNull(teamDeleteRequest)){
+        if (ObjUtil.isNull(teamDeleteRequest)) {
             throw new BusinessException(ErrorCode.PARAMS_NULL_ERROR);
         }
         Long teamId = teamDeleteRequest.getId();
-        if (ObjUtil.isNull(teamId) || teamId <= 0){
+        if (ObjUtil.isNull(teamId) || teamId <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         Team team = this.baseMapper.selectById(teamId);
-        if (ObjUtil.isNull(team)){
+        if (ObjUtil.isNull(team)) {
             throw new BusinessException(ErrorCode.RECORD_NOT_EXIST);
         }
-        if (!team.getOwnerUserId().equals(loginUser.getId())){
+        if (!team.getOwnerUserId().equals(loginUser.getId())) {
             throw new BusinessException(ErrorCode.NO_AUTH);
         }
         boolean removeTeamUsers = userTeamService.lambdaUpdate().eq(UserTeam::getTeamId, teamId).remove();
-        if (!removeTeamUsers){
+        if (!removeTeamUsers) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "删除队伍失败");
         }
         return removeById(teamId);
+    }
+
+    /**
+     * 获取我创建的队伍
+     *
+     * @param loginUser 登录用户
+     * @return 队伍列表
+     */
+    @Override
+    public List<TeamUserVo> myTeams(User loginUser) {
+        if (ObjUtil.isNull(loginUser)) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN);
+        }
+        List<Team> teams = lambdaQuery().eq(Team::getOwnerUserId, loginUser.getId()).list();
+
+        List<Long> teamIds = teams.stream().map(Team::getId).collect(Collectors.toList());
+        return getTeamUserVos(teamIds, teams);
+
+    }
+
+    /**
+     * 获取我加入的队伍
+     *
+     * @param loginUser 登录用户
+     * @return 队伍列表
+     */
+    @Override
+    public List<TeamUserVo> myJoinTeams(User loginUser) {
+        if (ObjUtil.isNull(loginUser)) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN);
+        }
+        List<Long> teamIds = userTeamService.lambdaQuery().eq(UserTeam::getUserId, loginUser.getId()).list()
+                .stream().map(UserTeam::getTeamId).collect(Collectors.toList());
+        List<Team> teams = lambdaQuery().in(Team::getId, teamIds).list();
+        return getTeamUserVos(teamIds, teams);
+    }
+
+    private List<TeamUserVo> getTeamUserVos(List<Long> teamIds, List<Team> teams) {
+        if (CollUtil.isEmpty(teamIds)) {
+            return Collections.emptyList();
+        }
+        List<UserTeam> userTeams = userTeamService.lambdaQuery().in(UserTeam::getTeamId, teamIds).list();
+        Map<Long, List<Long>> teamContainUsers = userTeams.stream().collect(Collectors.groupingBy(UserTeam::getTeamId, Collectors.mapping(UserTeam::getUserId, Collectors.toList())));
+        Set<Long> allUser = userTeams.stream().map(UserTeam::getUserId).collect(Collectors.toSet());
+        Map<Long, UserVo> userVoMap = userService.listByIds(allUser).stream()
+                .map(item -> BeanUtil.copyProperties(item, UserVo.class))
+                .collect(Collectors.toMap(UserVo::getId, item -> item));
+
+
+        return teams.stream().map(item -> {
+            TeamUserVo vo = BeanUtil.copyProperties(item, TeamUserVo.class);
+            List<UserVo> userVoList = teamContainUsers.get(vo.getId()).stream().map(userVoMap::get).collect(Collectors.toList());
+            vo.setUserList(userVoList);
+            return vo;
+        }).collect(Collectors.toList());
     }
 }
 

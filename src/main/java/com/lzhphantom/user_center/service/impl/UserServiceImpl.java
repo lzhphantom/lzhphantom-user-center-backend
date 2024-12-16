@@ -1,15 +1,22 @@
 package com.lzhphantom.user_center.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.ReUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.lzhphantom.user_center.common.ErrorCode;
 import com.lzhphantom.user_center.exception.BusinessException;
 import com.lzhphantom.user_center.mapper.UserMapper;
 import com.lzhphantom.user_center.model.domain.User;
 import com.lzhphantom.user_center.model.request.UserRegisterRequest;
+import com.lzhphantom.user_center.model.request.UserTagSearchRequest;
+import com.lzhphantom.user_center.model.vo.UserVo;
 import com.lzhphantom.user_center.service.UserService;
+import com.lzhphantom.user_center.utls.AlgorithmUtils;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -19,8 +26,7 @@ import org.springframework.util.DigestUtils;
 
 import javax.servlet.http.HttpServletRequest;
 
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.lzhphantom.user_center.constants.UserConstant.*;
@@ -150,25 +156,21 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     /**
      * 根据标签搜索用户 内存运算
      *
-     * @param tags 标签列
+     * @param request 标签列
      * @return 用户列
      */
     @Override
-    public List<User> searchUsersByTags(List<String> tags) {
-        if (CollectionUtils.isEmpty(tags)) {
+    public Page<User> searchUsersByTags(UserTagSearchRequest request) {
+        if (CollectionUtils.isEmpty(request.getTagList())) {
             throw new BusinessException(ErrorCode.PARAMS_NULL_ERROR);
         }
-        List<User> users = lambdaQuery().isNotNull(User::getTags).list();
-        return users.stream().filter(item -> {
-            String itemTags = item.getTags();
-            List<String> tagList = JSONUtil.toList(itemTags, String.class);
-            for (String tag : tags) {
-                if (!tagList.contains(tag)) {
-                    return false;
-                }
-            }
-            return true;
-        }).map(this::getSafetyUser).collect(Collectors.toList());
+
+        Page<User> page = lambdaQuery().isNotNull(User::getTags)
+                .and(wq -> {
+                    request.getTagList().forEach(tag -> wq.like(User::getTags, tag));
+                }).page(Page.of(request.getPageNum(), request.getPageSize()));
+        page.setRecords(page.getRecords().stream().map(this::getSafetyUser).collect(Collectors.toList()));
+        return page;
     }
 
     @Override
@@ -221,6 +223,30 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     public boolean isAdmin(User user) {
         return Objects.nonNull(user) && user.getRole() == ADMIN_ROLE;
     }
+
+    @Override
+    public List<UserVo> matchUser(long num, User loginUser) {
+        List<String> tagList = JSONUtil.toList(loginUser.getTags(), String.class);
+        List<User> userList = list().stream().filter(user -> !user.getId().equals(loginUser.getId())).collect(Collectors.toList());
+        SortedMap<Long, Double> similarUserMap = new TreeMap<>();
+        for (User user : userList) {
+            if (user.getTags().isEmpty()) {
+                continue;
+            }
+            List<String> userTagList = JSONUtil.toList(user.getTags(), String.class);
+            double similar = AlgorithmUtils.computeJaccardSimilarity(CollUtil.newHashSet(tagList), CollUtil.newHashSet(userTagList));
+            similarUserMap.put(user.getId(), similar);
+        }
+        Map<Long, Double> sortedMap = similarUserMap.entrySet().stream()
+                .sorted(Map.Entry.comparingByValue((o1, o2) -> Double.compare(o2, o1))).limit(num).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        List<Long> numedIdList = sortedMap.keySet().stream().collect(Collectors.toList());
+
+
+        return userList.stream().filter(item -> numedIdList.contains(item.getId()))
+                .map(item -> BeanUtil.copyProperties(item, UserVo.class))
+                .collect(Collectors.toList());
+    }
+
 
     /**
      * 通过sql查询

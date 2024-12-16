@@ -13,6 +13,7 @@ import com.lzhphantom.user_center.model.domain.User;
 import com.lzhphantom.user_center.model.dto.TeamQuery;
 import com.lzhphantom.user_center.model.request.team.*;
 import com.lzhphantom.user_center.model.vo.TeamUserVo;
+import com.lzhphantom.user_center.model.vo.TeamVo;
 import com.lzhphantom.user_center.service.TeamService;
 import com.lzhphantom.user_center.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -86,7 +87,7 @@ public class TeamController {
     }
 
     @GetMapping("/get")
-    public BaseResponse<Team> getTeamById(long id) {
+    public BaseResponse<TeamVo> getTeamById(long id) {
         if (id <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
@@ -94,7 +95,7 @@ public class TeamController {
         if (ObjUtil.isNull(team)) {
             throw new BusinessException(ErrorCode.RECORD_NOT_EXIST);
         }
-        return ResultUtils.success(team);
+        return ResultUtils.success(BeanUtil.copyProperties(team, TeamVo.class));
     }
 
     /**
@@ -153,10 +154,32 @@ public class TeamController {
         User loginUser = userService.getLoginUser(request);
         return ResultUtils.success(teamService.quitTeam(teamQuitRequest, loginUser));
     }
-    //解散队伍
-    //获取某队伍的详细信息
-    //获取我创建的队伍
-    //获取我加入的队伍
+
+    /**
+     * 获取我创建的队伍
+     * @param request 请求
+     * @return 队伍列表
+     */
+    @GetMapping("/list/my/create")
+    public BaseResponse<List<TeamUserVo>> listMyCreateTeam(HttpServletRequest request) {
+
+        User loginUser = userService.getLoginUser(request);
+
+        return ResultUtils.success(teamService.myTeams(loginUser));
+    }
+
+    /**
+     * 获取我加入的队伍
+     * @param request 请求
+     * @return 队伍列表
+     */
+    @GetMapping("/list/my/join")
+    public BaseResponse<List<TeamUserVo>> listMyJoinTeam(HttpServletRequest request) {
+
+        User loginUser = userService.getLoginUser(request);
+
+        return ResultUtils.success(teamService.myJoinTeams(loginUser));
+    }
     //获取某队伍的已加入用户列表
     //获取某队伍的已加入用户id列表
 }

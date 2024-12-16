@@ -62,6 +62,7 @@ public interface TeamMapper extends BaseMapper<Team> {
             "<if test='searchText != null and searchText.trim() != \"\"'> AND (name LIKE CONCAT('%', #{searchText}, '%') or description LIKE CONCAT('%', #{searchText}, '%'))</if>",
             "<if test='maxNum != null'> AND max_num = #{maxNum}</if>",
             "<if test='userId != null'> AND user_id = #{userId}</if>",
+            "<if test='ownerUserId != null'> AND owner_user_id = #{ownerUserId}</if>",
             "<if test='status != null'> AND status = #{status}</if>",
             "</script>"
     })

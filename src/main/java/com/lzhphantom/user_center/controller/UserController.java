@@ -12,6 +12,7 @@ import com.lzhphantom.user_center.model.domain.User;
 import com.lzhphantom.user_center.model.request.UserLoginRequest;
 import com.lzhphantom.user_center.model.request.UserRegisterRequest;
 import com.lzhphantom.user_center.model.request.UserTagSearchRequest;
+import com.lzhphantom.user_center.model.vo.UserVo;
 import com.lzhphantom.user_center.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -96,8 +97,8 @@ public class UserController {
     }
 
     @PostMapping("/search/tags")
-    public BaseResponse<List<User>> searchUsersByTags(@RequestBody UserTagSearchRequest request) {
-        return ResultUtils.success(userService.searchUsersByTags(request.getTagList()));
+    public BaseResponse<Page<User>> searchUsersByTags(@RequestBody UserTagSearchRequest request) {
+        return ResultUtils.success(userService.searchUsersByTags(request));
     }
 
     @GetMapping("/recommend")
@@ -136,5 +137,18 @@ public class UserController {
         return ResultUtils.success(userService.updateUser(user, request));
     }
 
-
+    /**
+     * 获取最匹配的用户
+     * @param num 匹配人数
+     * @param request http请求
+     * @return 匹配用户
+     */
+    @GetMapping("/match")
+    public BaseResponse<List<UserVo>> matchUsers(long num, HttpServletRequest request) {
+        if (num<=0 || num>20){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User loginUser = userService.getLoginUser(request);
+        return ResultUtils.success(userService.matchUser(num, loginUser));
+    }
 }

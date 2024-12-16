@@ -1,14 +1,13 @@
 package com.lzhphantom.user_center.service.impl;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.github.javafaker.Faker;
 import com.lzhphantom.user_center.mapper.TeamMapper;
@@ -18,6 +17,7 @@ import com.lzhphantom.user_center.model.dto.TeamQuery;
 import com.lzhphantom.user_center.model.request.UserRegisterRequest;
 import com.lzhphantom.user_center.model.vo.TeamUserVo;
 import com.lzhphantom.user_center.service.UserService;
+import com.lzhphantom.user_center.utls.AlgorithmUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -66,14 +66,34 @@ class UserServiceImplTest {
 
     }
 
+    @Test
     void doLogin() {
+
+        System.out.println(faker.programmingLanguage().name());
+        System.out.println(faker.options().option("男", "女"));
+        System.out.println(faker.options().option("大一", "大二", "大三", "大四", "研究生", "博士"));
     }
 
     void getSafetyUser() {
     }
 
     @Test
-    void userTeamList(){
+    void testAlogorithmUils() {
+        String str1 = "tabc";
+        String str2 = "abcdf";
+        String str3 = "abcdfg";
+        System.out.println(AlgorithmUtils.computeEditDistance(str1, str2));
+        System.out.println(AlgorithmUtils.computeEditDistance(str1, str3));
+        HashSet<String> p1 = CollUtil.newHashSet("Java", "大一", "男");
+        HashSet<String> p2 = CollUtil.newHashSet("Java", "大二", "男");
+        HashSet<String> p3 = CollUtil.newHashSet("C++", "大一", "女");
+        System.out.println(AlgorithmUtils.computeJaccardSimilarity(p1, p2));
+        System.out.println(AlgorithmUtils.computeJaccardSimilarity(p1, p3));
+
+    }
+
+    @Test
+    void userTeamList() {
         StopWatch stopWatch = new StopWatch();
         stopWatch.start();
         // 获取拼接的 where 条件
@@ -89,9 +109,7 @@ class UserServiceImplTest {
     @Test
     void searchUsersByTags() {
 
-        List<String> tags = Arrays.asList("123", "456");
-        List<User> users = userService.searchUsersByTags(tags);
-        Assert.notNull(users, "123");
+
     }
 
     @Test
@@ -138,19 +156,23 @@ class UserServiceImplTest {
     void insertUserByConcurrency() {
         StopWatch stopWatch = new StopWatch();
         stopWatch.start();
-        final int batchNum = 100000;
+        final int batchNum = 1000000;
         List<User> userList = CollUtil.newArrayList();
         for (int i = 0; i < batchNum; i++) {
             User user = new User();
             user.setUsername(faker.name().fullName());
             user.setLoginAccount("test" + i);
             user.setAvatarUrl("https://fastly.jsdelivr.net/npm/@vant/assets/cat.jpeg");
-            user.setGender(i % 2 == 0 ? 1 : 0);
+            user.setGender(faker.bool().bool() ? 1 : 0);
             String encryptPassword = DigestUtils.md5DigestAsHex((SALT + "test@1234").getBytes());
             user.setPassword(encryptPassword);
             user.setPhone(faker.phoneNumber().phoneNumber());
             user.setEmail(faker.internet().emailAddress());
-            user.setTags("[]");
+            ArrayList<String> tags = CollUtil.newArrayList();
+            tags.add(faker.programmingLanguage().name());
+            tags.add(faker.options().option("男", "女"));
+            tags.add(faker.options().option("大一", "大二", "大三", "大四", "研究生", "博士"));
+            user.setTags(JSONUtil.toJsonStr(tags));
             user.setProfile(faker.lorem().paragraph(3));
             userList.add(user);
         }

@@ -46,4 +46,6 @@ public class TeamQuery extends PageRequest implements Serializable {
      */
     private Integer status;
 
+    private Long ownerUserId;
+
 }

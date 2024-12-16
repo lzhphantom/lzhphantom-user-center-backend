@@ -1,8 +1,11 @@
 package com.lzhphantom.user_center.service;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.lzhphantom.user_center.model.domain.User;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.lzhphantom.user_center.model.request.UserRegisterRequest;
+import com.lzhphantom.user_center.model.request.UserTagSearchRequest;
+import com.lzhphantom.user_center.model.vo.UserVo;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -48,10 +51,10 @@ public interface UserService extends IService<User> {
     /**
      * 根据标签搜索用户
      *
-     * @param tags 标签列
+     * @param request 标签列
      * @return 用户数量
      */
-    List<User> searchUsersByTags(List<String> tags);
+    Page<User> searchUsersByTags(UserTagSearchRequest request);
 
     /**
      * 更新用户
@@ -71,4 +74,7 @@ public interface UserService extends IService<User> {
     boolean isAdmin(HttpServletRequest request);
 
     boolean isAdmin(User user);
+
+
+    List<UserVo> matchUser(long num, User loginUser);
 }
