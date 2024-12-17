@@ -10,6 +10,7 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
+import org.aspectj.lang.reflect.MethodSignature;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Component;
@@ -25,7 +26,7 @@ public class IdempotentAspect {
 
     private final RedissonClient redissonClient;
 
-    @Pointcut("@annotation(com.lzhphantom.common.redis.anno.Idempotent)")
+    @Pointcut("@annotation(com.lzhphantom.user_center.annotation.Idempotent)")
     public void idempotentPointCut() {
     }
 
@@ -66,9 +67,9 @@ public class IdempotentAspect {
 
     private String buildLockKey(ProceedingJoinPoint joinPoint, Idempotent idempotent) {
         if (StrUtil.isEmpty(idempotent.key())) {
-            throw new CommonException(CommonResultCode.IDEMPOTENT_KEY_NULL);
+            throw new BusinessException(ErrorCode.PARAMS_NULL_ERROR,"key不能为空");
         }
-        String keyPrefix = StringUtils.hasText(idempotent.key()) ? RedisKeyConstants.IDEMPOTENT_KEY + idempotent.key() : RedisKeyConstants.IDEMPOTENT_KEY;
+        String keyPrefix =  "idempotent:" + idempotent.key();
         Object[] args = joinPoint.getArgs();
         log.info("args: {}", args);
 
