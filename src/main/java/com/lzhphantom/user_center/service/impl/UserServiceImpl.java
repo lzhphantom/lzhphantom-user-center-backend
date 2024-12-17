@@ -8,6 +8,7 @@ import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.lzhphantom.user_center.annotation.Idempotent;
 import com.lzhphantom.user_center.common.ErrorCode;
 import com.lzhphantom.user_center.exception.BusinessException;
 import com.lzhphantom.user_center.mapper.UserMapper;
@@ -44,6 +45,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     @Override
     @Transactional
+    @Idempotent(key = "user:register:")
     public long userRegister(UserRegisterRequest dto) {
         // 校验
         if (StringUtils.isAnyBlank(dto.getUserAccount(), dto.getUserPassword(), dto.getCheckPassword())) {
@@ -174,6 +176,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    @Idempotent(key = "user:update:")
     public Integer updateUser(User user, HttpServletRequest request) {
 
         User loginUser = getLoginUser(request);

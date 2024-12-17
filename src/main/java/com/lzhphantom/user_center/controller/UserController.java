@@ -64,7 +64,7 @@ public class UserController {
     public BaseResponse<User> getCurrentUser(HttpServletRequest request) {
         Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
         if (Objects.isNull(userObj)) {
-            throw new BusinessException(ErrorCode.PARAMS_NULL_ERROR);
+            throw new BusinessException(ErrorCode.NOT_LOGIN);
         }
         User currentUser = (User) userObj;
         User user = userService.getById(currentUser.getId());

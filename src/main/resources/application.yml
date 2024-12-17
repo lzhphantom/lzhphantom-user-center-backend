@@ -18,9 +18,6 @@ server:
   port: 8011
   servlet:
     context-path: /api
-    session:
-      cookie:
-        domain: localhost
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
@@ -33,9 +30,10 @@ mybatis-plus:
 knife4j:
   enable: true
   openapi:
+    title: lzhphantom_user接口文档
     version: v4.0
     group:
-      test1:
+      default:
         api-rule: package
         api-rule-resources:
           - com.lzhphantom.user_center.controller

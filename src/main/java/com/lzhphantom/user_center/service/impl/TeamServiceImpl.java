@@ -8,6 +8,7 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.lzhphantom.user_center.annotation.Idempotent;
 import com.lzhphantom.user_center.common.ErrorCode;
 import com.lzhphantom.user_center.exception.BusinessException;
 import com.lzhphantom.user_center.model.domain.Team;
@@ -53,6 +54,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @Idempotent(key = "team:add:")
     public long addTeam(TeamAddRequest team, final User loginUser) {
         if (ObjUtil.isNull(team)) {
             throw new BusinessException(ErrorCode.PARAMS_NULL_ERROR);
@@ -170,7 +172,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             if (ObjUtil.isNull(statusEnum)) {
                 throw new BusinessException(ErrorCode.PARAMS_ERROR);
             }
-            if (!isAdmin && !statusEnum.equals(TeamStatusEnum.PUBLIC)) {
+            if (!isAdmin && statusEnum.equals(TeamStatusEnum.PRIVATE)) {
                 throw new BusinessException(ErrorCode.NO_AUTH);
             }
 
@@ -212,6 +214,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
      */
     @Override
     @Transactional
+    @Idempotent(key = "team:update:")
     public boolean updateTeam(TeamUpdateRequest request, User loginUser) {
 
         if (ObjUtil.isNull(request)) {
@@ -257,6 +260,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @Idempotent(key = "team:join:")
     public boolean joinTeam(TeamJoinRequest teamJoinRequest, User loginUser) {
         if (ObjUtil.isNull(teamJoinRequest)) {
             throw new BusinessException(ErrorCode.PARAMS_NULL_ERROR);
@@ -304,6 +308,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
      */
     @Override
     @Transactional
+    @Idempotent(key = "team:quit:")
     public boolean quitTeam(TeamQuitRequest teamQuitRequest, User loginUser) {
         if (ObjUtil.isNull(teamQuitRequest)) {
             throw new BusinessException(ErrorCode.PARAMS_NULL_ERROR);
@@ -358,6 +363,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @Idempotent(key = "team:delete:")
     public boolean deleteTeam(TeamDeleteRequest teamDeleteRequest, User loginUser) {
         if (ObjUtil.isNull(teamDeleteRequest)) {
             throw new BusinessException(ErrorCode.PARAMS_NULL_ERROR);
