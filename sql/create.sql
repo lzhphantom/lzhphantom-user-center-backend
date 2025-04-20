@@ -21,6 +21,11 @@ alter table `user`
 alter table `user`
     add column `profile` varchar(512) null comment '个人简介';
 
+ALTER TABLE `user` ADD FULLTEXT INDEX idx_username_fulltext (username);
+ALTER TABLE user DROP INDEX idx_username_fulltext;
+# username 建立索引
+alter table `user` add index idx_username (username);
+
 drop table if exists `team`;
 create table team
 (

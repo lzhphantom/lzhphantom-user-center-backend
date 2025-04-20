@@ -2,9 +2,7 @@ package com.lzhphantom.user_center.service.impl;
 
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.json.JSONUtil;
@@ -18,7 +16,9 @@ import com.lzhphantom.user_center.model.request.UserRegisterRequest;
 import com.lzhphantom.user_center.model.vo.TeamUserVo;
 import com.lzhphantom.user_center.service.UserService;
 import com.lzhphantom.user_center.utls.AlgorithmUtils;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.util.Assert;
@@ -30,6 +30,7 @@ import javax.annotation.Resource;
 import static com.lzhphantom.user_center.constants.UserConstant.SALT;
 
 @SpringBootTest
+@Slf4j
 class UserServiceImplTest {
     @Resource
     private UserService userService;
@@ -109,7 +110,6 @@ class UserServiceImplTest {
     @Test
     void searchUsersByTags() {
 
-
     }
 
     @Test
@@ -152,23 +152,62 @@ class UserServiceImplTest {
                 "兴趣爱好: " + String.join(", ", faker.options().option("阅读", "旅行", "编程", "电影", "音乐")) + "\n";
     }
 
-    @Test
+    @RepeatedTest(10)
     void insertUserByConcurrency() {
+        int totalRecords = 1_000_000; // 总记录数
+        int batchSize = 12_000; // 每批次生成1,000,000条数据
+        // 自定义线程池参数
+        int corePoolSize = Runtime.getRuntime().availableProcessors() * 2; // 核心线程数
+        int maximumPoolSize = corePoolSize; // 最大线程数
+        long keepAliveTime = 60L; // 空闲线程存活时间
+        TimeUnit unit = TimeUnit.SECONDS; // 时间单位
+        int queueSize = 180; // 有界队列大小
+        BlockingQueue<Runnable> workQueue = new ArrayBlockingQueue<>(queueSize); // 有界队列
+            RejectedExecutionHandler rejectedHandler = new ThreadPoolExecutor.CallerRunsPolicy(); // 拒绝策略
+
+        // 创建自定义线程池
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(corePoolSize, maximumPoolSize, keepAliveTime,
+                unit, workQueue, rejectedHandler);
+
         StopWatch stopWatch = new StopWatch();
         stopWatch.start();
-        final int batchNum = 1000000;
-        List<User> userList = CollUtil.newArrayList();
-        for (int i = 0; i < batchNum; i++) {
+
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+        // 分批次生成数据并提交任务
+        for (int i = 0; i < totalRecords; i += batchSize) {
+
+            int currentBatchSize = Math.min(batchSize, totalRecords - i);
+            int finalI = i;
+            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                List<User> userList = generateUsers(currentBatchSize);
+                userService.saveBatch(userList, 4000); // 批量插入数据库
+                log.info("completed task:{}", finalI);
+            }, executor);
+            futures.add(future);
+        }
+
+        // 等待所有任务完成
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+        executor.shutdown();
+        stopWatch.stop();
+
+        System.out.println("总耗时: " + stopWatch.getTotalTimeMillis() + "ms");
+    }
+    private  static final String encryptPassword = DigestUtils.md5DigestAsHex((SALT + "test@1234").getBytes());
+    // 生成用户数据的方法
+    private List<User> generateUsers(int count) {
+        List<User> userList = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
             User user = new User();
             user.setUsername(faker.name().fullName());
-            user.setLoginAccount("test" + i);
+            user.setLoginAccount(faker.name().username());
             user.setAvatarUrl("https://fastly.jsdelivr.net/npm/@vant/assets/cat.jpeg");
             user.setGender(faker.bool().bool() ? 1 : 0);
-            String encryptPassword = DigestUtils.md5DigestAsHex((SALT + "test@1234").getBytes());
             user.setPassword(encryptPassword);
             user.setPhone(faker.phoneNumber().phoneNumber());
             user.setEmail(faker.internet().emailAddress());
-            ArrayList<String> tags = CollUtil.newArrayList();
+            ArrayList<String> tags = new ArrayList<>();
             tags.add(faker.programmingLanguage().name());
             tags.add(faker.options().option("男", "女"));
             tags.add(faker.options().option("大一", "大二", "大三", "大四", "研究生", "博士"));
@@ -176,31 +215,6 @@ class UserServiceImplTest {
             user.setProfile(faker.lorem().paragraph(3));
             userList.add(user);
         }
-        // 将数据分成10组
-        int numberOfGroups = 10;
-        int groupSize = userList.size() / numberOfGroups;
-        List<List<User>> groups = CollUtil.newArrayList();
-        for (int i = 0; i < numberOfGroups; i++) {
-            int fromIndex = i * groupSize;
-            int toIndex = (i == numberOfGroups - 1) ? userList.size() : fromIndex + groupSize;
-            groups.add(userList.subList(fromIndex, toIndex));
-        }
-        // 提交任务到线程池
-        // 创建一个固定大小的线程池
-        ExecutorService executorService = Executors.newFixedThreadPool(numberOfGroups);
-        List<CompletableFuture<Void>> futures = CollUtil.newArrayList();
-        for (List<User> group : groups) {
-            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
-                System.out.println("test" + Thread.currentThread().getName());
-                userService.saveBatch(group, 1000);
-            }, executorService);
-            futures.add(future);
-        }
-        // 等待所有任务完成
-        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
-        // 关闭线程池
-        executorService.shutdown();
-        stopWatch.stop();
-        System.out.println(stopWatch.getTotalTimeMillis());
+        return userList;
     }
 }
